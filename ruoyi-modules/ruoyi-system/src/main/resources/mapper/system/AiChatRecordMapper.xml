@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.AiChatRecordMapper">
+
+    <!-- 使用全限定类名，避免依赖 Nacos 中的 type-aliases-package 配置 -->
+    <resultMap type="com.ruoyi.system.domain.AiChatRecord" id="AiChatRecordResult">
+        <id     property="id"           column="id"             />
+        <result property="userId"       column="user_id"        />
+        <result property="userQuestion" column="user_question"  />
+        <result property="aiAnswer"     column="ai_answer"      />
+        <result property="knowledgeIds" column="knowledge_ids"  />
+        <result property="chatTime"     column="chat_time"      />
+    </resultMap>
+
+    <sql id="selectAiChatRecordVo">
+        select id, user_id, user_question, ai_answer, knowledge_ids, chat_time
+        from ai_chat_record
+    </sql>
+
+    <!-- 按主键查询 -->
+    <select id="selectAiChatRecordById" resultMap="AiChatRecordResult">
+        <include refid="selectAiChatRecordVo"/>
+        where id = #{id}
+    </select>
+
+    <!-- 按用户查询对话历史；Service 层调用 startPage() 即由 PageHelper 完成分页 -->
+    <select id="selectPageByUserId" resultMap="AiChatRecordResult">
+        <include refid="selectAiChatRecordVo"/>
+        where user_id = #{userId}
+        order by chat_time desc, id desc
+    </select>
+
+    <!-- 多条件查询，按对话时间倒序 -->
+    <select id="selectAiChatRecordList" parameterType="com.ruoyi.system.domain.AiChatRecord" resultMap="AiChatRecordResult">
+        <include refid="selectAiChatRecordVo"/>
+        <where>
+            <if test="userId != null">
+                AND user_id = #{userId}
+            </if>
+            <if test="userQuestion != null and userQuestion != ''">
+                AND user_question like concat('%', #{userQuestion}, '%')
+            </if>
+            <if test="aiAnswer != null and aiAnswer != ''">
+                AND ai_answer like concat('%', #{aiAnswer}, '%')
+            </if>
+            <if test="knowledgeIds != null and knowledgeIds != ''">
+                AND knowledge_ids like concat('%', #{knowledgeIds}, '%')
+            </if>
+        </where>
+        order by chat_time desc, id desc
+    </select>
+
+    <!-- 统计用户对话条数 -->
+    <select id="countByUserId" resultType="int">
+        select count(*) from ai_chat_record where user_id = #{userId}
+    </select>
+
+    <!-- 新增：user_id / user_question / ai_answer 为非空列，必须传入；
+         knowledge_ids 可空，chat_time 由数据库默认值维护 -->
+    <insert id="insertAiChatRecord" parameterType="com.ruoyi.system.domain.AiChatRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into ai_chat_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            user_id, user_question, ai_answer,
+            <if test="knowledgeIds != null and knowledgeIds != ''">knowledge_ids,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{userId}, #{userQuestion}, #{aiAnswer},
+            <if test="knowledgeIds != null and knowledgeIds != ''">#{knowledgeIds},</if>
+        </trim>
+    </insert>
+
+    <!-- 按主键修改，只更新传入的非空字段（可用于补写关联知识库ID）；
+         id = id 是兜底，避免所有条件为空时生成空 SET -->
+    <update id="updateAiChatRecord" parameterType="com.ruoyi.system.domain.AiChatRecord">
+        update ai_chat_record
+        <set>
+            <if test="userId != null">user_id = #{userId}, </if>
+            <if test="userQuestion != null and userQuestion != ''">user_question = #{userQuestion}, </if>
+            <if test="aiAnswer != null and aiAnswer != ''">ai_answer = #{aiAnswer}, </if>
+            <if test="knowledgeIds != null">knowledge_ids = #{knowledgeIds}, </if>
+            id = id
+        </set>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除；空数组时退化成 where 1 = 0，避免 in () 语法错误 -->
+    <delete id="deleteAiChatRecordByIds">
+        delete from ai_chat_record
+        where
+        <choose>
+            <when test="ids != null and ids.length > 0">
+                id in
+                <foreach item="id" collection="ids" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </when>
+            <otherwise>
+                1 = 0
+            </otherwise>
+        </choose>
+    </delete>
+
+    <!-- 清空指定用户的对话历史 -->
+    <delete id="deleteByUserId">
+        delete from ai_chat_record where user_id = #{userId}
+    </delete>
+
+    <!-- 数据保留策略：分批删除过期记录，避免一次性 delete 造成长时间锁表 -->
+    <delete id="deleteBefore">
+        delete from ai_chat_record
+        where chat_time &lt; #{before}
+        order by id
+        limit #{limit}
+    </delete>
+
+</mapper>

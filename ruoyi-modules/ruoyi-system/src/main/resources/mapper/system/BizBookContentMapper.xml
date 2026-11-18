@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.BizBookContentMapper">
+
+    <resultMap type="BizBookContent" id="BizBookContentResult">
+        <result property="id"          column="id"           />
+        <result property="bookId"      column="book_id"      />
+        <result property="fileName"    column="file_name"    />
+        <result property="filePath"    column="file_path"    />
+        <result property="fileType"    column="file_type"    />
+        <result property="charCount"   column="char_count"   />
+        <result property="chunkCount"  column="chunk_count"  />
+        <result property="parseStatus" column="parse_status" />
+        <result property="parseMsg"    column="parse_msg"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <resultMap type="BizBookChunk" id="BizBookChunkResult">
+        <result property="id"         column="id"         />
+        <result property="bookId"     column="book_id"    />
+        <result property="chunkNo"    column="chunk_no"   />
+        <result property="chapter"    column="chapter"    />
+        <result property="content"    column="content"    />
+        <result property="charCount"  column="char_count" />
+        <result property="vectorId"   column="vector_id"  />
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="selectContentVo">
+        select id, book_id, file_name, file_path, file_type, char_count, chunk_count,
+               parse_status, parse_msg, create_time, update_time
+        from biz_book_content
+    </sql>
+
+    <select id="selectContentByBookId" parameterType="Long" resultMap="BizBookContentResult">
+        <include refid="selectContentVo"/> where book_id = #{bookId}
+    </select>
+
+    <insert id="insertContent" parameterType="BizBookContent" useGeneratedKeys="true" keyProperty="id">
+        insert into biz_book_content
+            (book_id, file_name, file_path, file_type, char_count, chunk_count, parse_status, parse_msg)
+        values
+            (#{bookId}, #{fileName}, #{filePath}, #{fileType}, #{charCount}, #{chunkCount}, #{parseStatus}, #{parseMsg})
+    </insert>
+
+    <update id="updateContent" parameterType="BizBookContent">
+        update biz_book_content
+        <set>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="fileType != null">file_type = #{fileType},</if>
+            <if test="charCount != null">char_count = #{charCount},</if>
+            <if test="chunkCount != null">chunk_count = #{chunkCount},</if>
+            <if test="parseStatus != null">parse_status = #{parseStatus},</if>
+            <if test="parseMsg != null">parse_msg = #{parseMsg},</if>
+        </set>
+        where book_id = #{bookId}
+    </update>
+
+    <delete id="deleteContentByBookId" parameterType="Long">
+        delete from biz_book_content where book_id = #{bookId}
+    </delete>
+
+    <delete id="deleteChunksByBookId" parameterType="Long">
+        delete from biz_book_chunk where book_id = #{bookId}
+    </delete>
+
+    <insert id="batchInsertChunks">
+        insert into biz_book_chunk (book_id, chunk_no, chapter, content, char_count, vector_id) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.bookId}, #{item.chunkNo}, #{item.chapter}, #{item.content}, #{item.charCount}, #{item.vectorId})
+        </foreach>
+    </insert>
+
+    <select id="selectChunksByBookId" parameterType="Long" resultMap="BizBookChunkResult">
+        select id, book_id, chunk_no, chapter, content, char_count, vector_id, create_time
+        from biz_book_chunk
+        where book_id = #{bookId}
+        order by chunk_no
+    </select>
+
+    <select id="selectChunkOutline" parameterType="Long" resultMap="BizBookChunkResult">
+        select id, book_id, chunk_no, chapter, char_count
+        from biz_book_chunk
+        where book_id = #{bookId}
+        order by chunk_no
+    </select>
+
+    <select id="selectChunkByNo" resultMap="BizBookChunkResult">
+        select id, book_id, chunk_no, chapter, content, char_count, vector_id, create_time
+        from biz_book_chunk
+        where book_id = #{bookId} and chunk_no = #{chunkNo}
+    </select>
+
+    <select id="countChunksByBookId" parameterType="Long" resultType="int">
+        select count(1) from biz_book_chunk where book_id = #{bookId}
+    </select>
+
+</mapper>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.AiIntentMapper">
+
+    <!-- 使用全限定类名，避免依赖 Nacos 中的 type-aliases-package 配置 -->
+    <resultMap type="com.ruoyi.system.domain.AiIntent" id="AiIntentResult">
+        <id     property="id"         column="id"           />
+        <result property="intentName" column="intent_name" />
+        <result property="intentDesc" column="intent_desc" />
+        <result property="keywords"   column="keywords"    />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectAiIntentVo">
+        select id, intent_name, intent_desc, keywords, create_time, update_time
+        from ai_intent
+    </sql>
+
+    <!-- 按主键查询 -->
+    <select id="selectAiIntentById" resultMap="AiIntentResult">
+        <include refid="selectAiIntentVo"/>
+        where id = #{id}
+    </select>
+
+    <!-- 按意图名称精确查询（intent_name 上有唯一索引 uk_intent_name） -->
+    <select id="selectAiIntentByName" resultMap="AiIntentResult">
+        <include refid="selectAiIntentVo"/>
+        where intent_name = #{intentName}
+    </select>
+
+    <!-- 多条件查询 -->
+    <select id="selectAiIntentList" parameterType="com.ruoyi.system.domain.AiIntent" resultMap="AiIntentResult">
+        <include refid="selectAiIntentVo"/>
+        <where>
+            <if test="intentName != null and intentName != ''">
+                AND intent_name like concat('%', #{intentName}, '%')
+            </if>
+            <if test="intentDesc != null and intentDesc != ''">
+                AND intent_desc like concat('%', #{intentDesc}, '%')
+            </if>
+            <if test="keywords != null and keywords != ''">
+                AND keywords like concat('%', #{keywords}, '%')
+            </if>
+        </where>
+        order by id
+    </select>
+
+    <!-- 查询全部意图，供意图识别时在内存中按 keywords 做匹配 -->
+    <select id="selectAllIntents" resultMap="AiIntentResult">
+        <include refid="selectAiIntentVo"/>
+        order by id
+    </select>
+
+    <!-- 按关键词反查意图：keywords 是逗号分隔串，FIND_IN_SET 精确命中某一项，
+         LIKE 兼容部分匹配；关键词为空时返回全部 -->
+    <select id="selectByKeyword" resultMap="AiIntentResult">
+        <include refid="selectAiIntentVo"/>
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (FIND_IN_SET(#{keyword}, keywords) > 0
+                     or keywords like concat('%', #{keyword}, '%')
+                     or intent_name like concat('%', #{keyword}, '%'))
+            </if>
+        </where>
+        order by id
+    </select>
+
+    <!-- 新增：intent_name / keywords 为非空列且无默认值，必须显式传入；
+         create_time、update_time 由数据库默认值与 ON UPDATE CURRENT_TIMESTAMP 维护 -->
+    <insert id="insertAiIntent" parameterType="com.ruoyi.system.domain.AiIntent"
+            useGeneratedKeys="true" keyProperty="id">
+        insert into ai_intent
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            intent_name, keywords,
+            <if test="intentDesc != null and intentDesc != ''">intent_desc,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{intentName}, #{keywords},
+            <if test="intentDesc != null and intentDesc != ''">#{intentDesc},</if>
+        </trim>
+    </insert>
+
+    <!-- 按主键修改，只更新传入的非空字段；
+         id = id 是兜底，避免所有条件为空时生成空 SET -->
+    <update id="updateAiIntent" parameterType="com.ruoyi.system.domain.AiIntent">
+        update ai_intent
+        <set>
+            <if test="intentName != null and intentName != ''">intent_name = #{intentName}, </if>
+            <if test="intentDesc != null">intent_desc = #{intentDesc}, </if>
+            <if test="keywords != null and keywords != ''">keywords = #{keywords}, </if>
+            id = id
+        </set>
+        where id = #{id}
+    </update>
+
+    <!-- 批量删除；空数组时退化成 where 1 = 0，避免 in () 语法错误 -->
+    <delete id="deleteAiIntentByIds">
+        delete from ai_intent
+        where
+        <choose>
+            <when test="ids != null and ids.length > 0">
+                id in
+                <foreach item="id" collection="ids" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </when>
+            <otherwise>
+                1 = 0
+            </otherwise>
+        </choose>
+    </delete>
+
+</mapper>

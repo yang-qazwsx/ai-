@@ -1,0 +1,113 @@
+
+# SCA 2025.1.x 已移除 Spring Cloud Bootstrap 支持，本模块不再使用 bootstrap.yml：
+# 端口 / 应用名 / profile / 注册中心地址 / spring.config.import 全部集中在此文件。
+# 配合 pom.xml 里把 spring-cloud-starter-bootstrap 覆盖为 test scope，
+# 运行时 classpath 不含 Marker，不会创建 bootstrap context。
+#
+# 智谱大模型密钥 / 端点 / 模型名 / 客服调优参数 全部由 Nacos 注入：
+#   dataId = ruoyi-system-ai-dev.yml  (group = DEFAULT_GROUP)
+# 见下面的 spring.config.import 与 sql/ai_nacos_config.sql。
+#
+# !! 启动必须带 -Dfile.encoding=UTF-8 !!
+#   Nacos 上的 yml 含中文注释，JDK17 在中文 Windows 下默认 file.encoding=GBK，
+#   Spring Cloud Alibaba 解析 YAML 时按默认字符集转字节会抛 MalformedInputException，
+#   异常被吞成 "Config data resource 'nacos:xxx' does not exist"，看起来像配置不存在。
+#   mvn spring-boot:run 已由 pom.xml 的 jvmArguments 固定；
+#   用 IDEA 直接跑 main 方法时，需在 Run Configuration 的 VM options 里加这一项。
+server:
+  port: 9201
+
+spring:
+  application:
+    name: ruoyi-system
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      # SCA 2025.1.x 官方推荐顶层地址（config/discovery 自动继承）
+      server-addr: 127.0.0.1:8848
+      discovery:
+        server-addr: 127.0.0.1:8848
+      config:
+        server-addr: 127.0.0.1:8848
+
+  # 后加载的优先级更高，AI 配置放最后
+  config:
+    import:
+      - nacos:application-dev.yml
+      - nacos:ruoyi-system-dev.yml
+      - nacos:ruoyi-system-ai-dev.yml
+
+  # 书籍正文上传：默认 1MB 对整本书不够；PDF 教材常见 20MB+，放宽到 50MB
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  ai:
+    vectorstore:
+      redis:
+        initialize-schema: true
+        prefix: aa_rag_prefix # 旧混索引配置，保留仅为兼容；新代码已用 ai.vector.* 三个独立索引
+        # 2.0.2 的属性名是 index-name，写 index 不会生效
+        index-name: aa_rag_index
+
+  # 数据源配置
+  data:
+    redis:
+      # RedisVectorStoreAutoConfiguration.vectorStore() 需要 JedisConnectionFactory，
+      # Spring Boot 默认是 LettuceConnectionFactory，类型不匹配会注入失败
+      client-type: jedis
+      host: localhost # redis服务地址
+      port: 6379
+
+# 书籍内容存储：原文件落盘后才能支持「在线浏览」（PDF 直接内嵌预览），
+# 分片正文仍在 MySQL（biz_book_chunk）+ Redis 向量库，二者互不依赖。
+# 注意：此项必须放在顶层（与 spring 同级），不能写进 spring 段内。
+ai:
+  # 向量库按业务域拆分为三个独立索引，不再共用 aa_rag_index。
+  # 旧数据迁移见 sql/redis_vector_split_migration.md。
+  vector:
+    knowledge:
+      index-name: aa_knowledge_index
+      prefix: aa_knowledge_prefix
+    book:
+      index-name: aa_book_index
+      prefix: aa_book_prefix
+    memory:
+      index-name: aa_memory_index
+      prefix: aa_memory_prefix
+  # 智能客服调优参数（原硬编码，现外置到配置，便于不同环境/模型调参）
+  chat:
+    # 知识库直达相似度安全阀：与 Nacos ruoyi-system-ai-dev.yml 保持一致。
+    # 实测相关/不相关问法分数都在 0.80 附近，故抬高到 0.92 让该分支几乎不参与，主力走归一化文本匹配。
+    direct-similarity-threshold: 0.92
+    direct-text-match-enabled: true       # 归一化文本匹配直达开关
+    search-similarity-threshold: 0.5      # 向量检索召回相似度门槛
+    search-top-k: 3                        # 向量检索 topK
+    hot-cache-expire-seconds: 7200         # 热门问题缓存 TTL（秒）
+    rate-limit-per-minute: 20              # 单用户每分钟提问上限（防脚本刷接口烧 LLM 额度）
+    stock-search-limit: 50                 # 图书检索单次返回上限
+    # 测试环境专用：仅本地无网关直连实例开启，按 X-Test-User 注入登录态/全量权限。
+    # 生产必须保持 false，避免绕过 @RequiresPermissions 与 userId fail-closed 策略。
+    test-security-bypass: false
+  book:
+    # 相对路径基于服务启动目录；生产环境建议挂载独立数据盘（如 /data/ruoyi/book-files）
+    storage-dir: ./data/book-files
+    # 分片与检索参数（原硬编码）
+    chunk-size: 500                        # 单片最大字数
+    chunk-overlap: 50                      # 相邻分片重叠字数
+    vector-batch: 50                       # 向量写入批大小
+    search-threshold: 0.3                  # 书籍正文检索相似度阈值
+    # 图书检索：ES 只做检索索引，价格/库存仍以 MySQL 为准
+    search:
+      es-enabled: true
+      # 注意端口不是 9200/9300：本机 9200 被 ruoyi-auth、9300 被 ruoyi-file 占用
+      es-uri: http://127.0.0.1:9220
+      index-name: biz_book_search
+      # 官方客户端（rest5/HttpClient5）的连接与请求超时；ES 慢时快速失败并降级 MySQL
+      connect-timeout-seconds: 2
+      request-timeout-seconds: 5
+      # 启动时索引为空则自动全量同步（异步，不阻塞启动）
+      bootstrap-on-start: true
+

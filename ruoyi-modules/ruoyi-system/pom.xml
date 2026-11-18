@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.ruoyi</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>3.6.8</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+	
+    <artifactId>ruoyi-modules-system</artifactId>
+
+    <description>
+        ruoyi-modules-system系统模块
+    </description>
+	
+    <dependencies>
+        <!-- SCA 2025.1.x 已移除 Spring Cloud Bootstrap 支持。
+             根 pom 的 <dependencies> 全局引了 spring-cloud-starter-bootstrap，
+             该 starter 靠 classpath 里的 org.springframework.cloud.bootstrap.marker.Marker
+             触发创建 bootstrap context，会让 Nacos ConfigData 在 bootstrap 阶段解析 import
+             并拿不到 NacosConfigManager，最终报 "does not exist"。
+             这里重新声明同一 GAV 并设为 test scope，覆盖父 pom 继承的 compile 依赖：
+             本模块运行时 classpath 不再含 Marker，且不影响 gateway/auth 等其他模块。 -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Spring AI 依赖：版本由根 pom 的 spring-ai-bom (2.0.2) 统一管理 -->
+        <!-- openai starter 已传递引入 ChatClient、EmbeddingModel 及 chat-memory 自动配置 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-vector-store</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- Elasticsearch 官方 Java 客户端（图书检索索引层）。
+             版本由根 pom 的 spring-boot-dependencies 统一管理（4.0.6 → 9.2.8），
+             与运行中的 ES 9.2.x 服务端版本线一致，不需要手写版本号；
+             传递引入 elasticsearch-rest5-client（Apache HttpClient5）+ jakarta.json。 -->
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+        </dependency>
+
+        <!-- PDF 文本抽取（书籍上传支持 pdf）：
+             只用于抽取正文做分片与向量化，原文件另行落盘供在线预览。
+             选 2.0.x 是因为 3.x 需要 JDK17+ 与更多传递依赖，2.0.31 更轻。 -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.31</version>
+        </dependency>
+
+        <!-- 智谱 AI：Spring AI 2.0.x 官方已移除 spring-ai-starter-model-zhipuai，
+             Maven Central 上最高只有 2.0.0-M4，2.0.2 为 404，spring-ai-bom 2.0.2 也不管理它。
+             写在这里会让 Maven 连 POM 都解析不了，IDE 进而报一堆"程序包不存在"。
+             接入智谱请直接用上面的 openai starter 走 OpenAI 兼容协议：
+             spring.ai.openai.base-url = https://open.bigmodel.cn/api/paas/v4
+             spring.ai.openai.chat.model = glm-4-flash
+             spring.ai.openai.embedding.model = embedding-3 -->
+
+    	<!-- SpringCloud Alibaba Nacos -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        
+        <!-- SpringCloud Alibaba Nacos Config -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+        
+    	<!-- SpringCloud Alibaba Sentinel -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+        </dependency>
+        
+    	<!-- SpringBoot Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        
+        <!-- Mysql Connector -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+        
+        <!-- RuoYi Common DataSource -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-datasource</artifactId>
+        </dependency>
+        
+        <!-- RuoYi Common DataScope -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-datascope</artifactId>
+        </dependency>
+        
+        <!-- RuoYi Common Log -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        
+        <!-- RuoYi Common Swagger -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-common-swagger</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+        </dependency>
+
+        <!-- 单元测试：仅覆盖不依赖 Spring / DB / LLM 的纯逻辑（订单号、预算、归一化）。
+             显式指定版本，避免为跑测试额外下载 Spring Boot 4 对应的 JUnit 6。 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Nacos 上的 yml 含中文注释，JDK17 在中文 Windows 下默认 file.encoding=GBK，
+                         SCA 解析 YAML 时按默认字符集转字节会抛 MalformedInputException，
+                         最终被包装成 "Config data resource ... does not exist"，配置全部加载失败。
+                         这里固定 UTF-8，保证 mvn spring-boot:run 与 java -jar 行为一致。 -->
+                    <jvmArguments>-Dfile.encoding=UTF-8</jvmArguments>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+   
+</project>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.BizOrderMapper">
+
+    <resultMap type="com.ruoyi.system.domain.BizOrder" id="BizOrderResult">
+        <id     property="orderId"    column="order_id"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="userId"     column="user_id"     />
+        <result property="bookId"     column="book_id"     />
+        <result property="bookTitle"  column="book_title"  />
+        <result property="quantity"   column="quantity"    />
+        <result property="amount"     column="amount"      />
+        <result property="status"     column="status"      />
+        <result property="receiver"   column="receiver"    />
+        <result property="phone"      column="phone"       />
+        <result property="address"    column="address"     />
+        <result property="remark"     column="remark"      />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectBizOrderVo">
+        select order_id, order_no, user_id, book_id, book_title, quantity, amount,
+               status, receiver, phone, address, remark, create_time, update_time
+        from biz_order
+    </sql>
+
+    <select id="selectBizOrderById" resultMap="BizOrderResult">
+        <include refid="selectBizOrderVo"/>
+        where order_id = #{orderId}
+    </select>
+
+    <!-- 智能客服按订单号查真实状态，走 uk_order_no 唯一索引 -->
+    <select id="selectBizOrderByOrderNo" resultMap="BizOrderResult">
+        <include refid="selectBizOrderVo"/>
+        where order_no = #{orderNo}
+    </select>
+
+    <select id="selectBizOrderList" parameterType="com.ruoyi.system.domain.BizOrder" resultMap="BizOrderResult">
+        <include refid="selectBizOrderVo"/>
+        <where>
+            <if test="orderNo != null and orderNo != ''">AND order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="bookTitle != null and bookTitle != ''">AND book_title like concat('%', #{bookTitle}, '%')</if>
+            <if test="receiver != null and receiver != ''">AND receiver like concat('%', #{receiver}, '%')</if>
+            <if test="phone != null and phone != ''">AND phone like concat('%', #{phone}, '%')</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="bookId != null">AND book_id = #{bookId}</if>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+        </where>
+        order by order_id desc
+    </select>
+
+    <insert id="insertBizOrder" parameterType="com.ruoyi.system.domain.BizOrder"
+            useGeneratedKeys="true" keyProperty="orderId">
+        insert into biz_order
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            order_no,
+            <if test="userId != null">user_id,</if>
+            <if test="bookId != null">book_id,</if>
+            <if test="bookTitle != null and bookTitle != ''">book_title,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="amount != null">amount,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="receiver != null and receiver != ''">receiver,</if>
+            <if test="phone != null and phone != ''">phone,</if>
+            <if test="address != null and address != ''">address,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{orderNo},
+            <if test="userId != null">#{userId},</if>
+            <if test="bookId != null">#{bookId},</if>
+            <if test="bookTitle != null and bookTitle != ''">#{bookTitle},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="receiver != null and receiver != ''">#{receiver},</if>
+            <if test="phone != null and phone != ''">#{phone},</if>
+            <if test="address != null and address != ''">#{address},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateBizOrder" parameterType="com.ruoyi.system.domain.BizOrder">
+        update biz_order
+        <set>
+            <if test="orderNo != null and orderNo != ''">order_no = #{orderNo}, </if>
+            <if test="bookId != null">book_id = #{bookId}, </if>
+            <if test="bookTitle != null and bookTitle != ''">book_title = #{bookTitle}, </if>
+            <if test="quantity != null">quantity = #{quantity}, </if>
+            <if test="amount != null">amount = #{amount}, </if>
+            <if test="status != null and status != ''">status = #{status}, </if>
+            <if test="receiver != null">receiver = #{receiver}, </if>
+            <if test="phone != null">phone = #{phone}, </if>
+            <if test="address != null">address = #{address}, </if>
+            <if test="remark != null">remark = #{remark}, </if>
+            order_id = order_id
+        </set>
+        where order_id = #{orderId}
+    </update>
+
+    <delete id="deleteBizOrderByIds">
+        delete from biz_order
+        where
+        <choose>
+            <when test="ids != null and ids.length > 0">
+                order_id in
+                <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <otherwise>1 = 0</otherwise>
+        </choose>
+    </delete>
+
+</mapper>

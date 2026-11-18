@@ -1,0 +1,53 @@
+# ============================================================
+# dataId : ruoyi-system-ai-dev.yml
+# group  : DEFAULT_GROUP
+# 用途   : 智谱大模型 / Spring AI / 智能客服调优参数，由 Nacos 注入
+# 加载方 : ruoyi-system 的 application.yml -> spring.config.import
+# 注意   : 修改后需重启 ruoyi-system。Spring AI 的 ChatModel /
+#          EmbeddingModel 在启动时构建，Nacos 动态刷新不会重建这些 Bean。
+#
+# 【部署前必做】把下面的 __ZHIPU_API_KEY__ 替换成你的真实 Key。
+# ============================================================
+
+spring:
+  ai:
+    openai:
+      api-key: __ZHIPU_API_KEY__
+      # 智谱 OpenAI 兼容端点必须带 /v4，否则 SDK 会拼出 /api/paas/embeddings（404）
+      base-url: "https://open.bigmodel.cn/api/paas/v4"
+      # Spring AI 2.0 用扁平属性，不再走 1.x 的 .options 段
+      chat:
+        # glm-4.5 是思考型模型，单次生成实测约 13s；
+        # glm-4-flash 为免费快模型，约 1~3s，做知识库答案润色质量足够
+        model: "glm-4-flash"
+      embedding:
+        model: "embedding-3"
+        dimensions: 256
+
+  http:
+    client:
+      # 外网调用读超时：必须小于前端 60s 超时，否则前端已失败、后端还在跑并继续写记录/缓存。
+      # 45s 给慢模型留余量，同时保证后端先于前端失败并走兜底。
+      read-timeout: 45000
+
+# 智能客服「知识库直达」参数：命中后跳过调用大模型，直接返回知识库标准答案
+ai:
+  chat:
+    # 相似度安全阀。端到端实测：相关问法召回分数 0.81~0.86，
+    # 不相关问题（如「图书可以货到付款吗」）也能拿到 0.8024，
+    # 所以 0.80 会误判；设 0.92 让该分支几乎不参与判定。
+    # 主力直达判定是 AiServiceImpl.findDirectAnswer 的「归一化文本匹配」。
+    direct-similarity-threshold: 0.92
+    direct-text-match-enabled: true
+
+    # 单用户每分钟提问上限：防脚本刷接口烧 LLM 额度；Redis 故障时 fail-open（不阻断正常问答）
+    rate-limit-per-minute: 20
+
+    # 数据保留策略：默认关闭，确认业务口径后再开启。
+    # ai_chat_record 会随问答无限增长，且含用户隐私，建议保留 180 天。
+    cleanup-enabled: false
+    record-retention-days: 180
+    # 每天 03:20 清理，单批 2000 条、最多 20 批，避免大事务锁表
+    cleanup-cron: "0 20 3 * * ?"
+    cleanup-batch-size: 2000
+    cleanup-max-batches: 20

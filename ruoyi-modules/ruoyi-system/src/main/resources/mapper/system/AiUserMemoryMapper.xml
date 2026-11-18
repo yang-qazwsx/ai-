@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.AiUserMemoryMapper">
+
+    <resultMap type="AiUserMemory" id="AiUserMemoryResult">
+        <result property="id"             column="id"               />
+        <result property="userId"         column="user_id"          />
+        <result property="memoryType"     column="memory_type"      />
+        <result property="content"        column="content"          />
+        <result property="keywords"       column="keywords"         />
+        <result property="vectorId"       column="vector_id"        />
+        <result property="confidence"     column="confidence"       />
+        <result property="sourceRecordId" column="source_record_id" />
+        <result property="hitCount"       column="hit_count"        />
+        <result property="lastHitTime"    column="last_hit_time"    />
+        <result property="createTime"     column="create_time"      />
+        <result property="updateTime"     column="update_time"      />
+    </resultMap>
+
+    <resultMap type="AiUserProfile" id="AiUserProfileResult">
+        <result property="id"                  column="id"                   />
+        <result property="userId"              column="user_id"              />
+        <result property="tags"                column="tags"                 />
+        <result property="preferredCategories" column="preferred_categories" />
+        <result property="preferredBooks"      column="preferred_books"      />
+        <result property="totalQuestions"      column="total_questions"      />
+        <result property="totalSessions"       column="total_sessions"       />
+        <result property="lastActiveTime"      column="last_active_time"      />
+        <result property="profileSummary"      column="profile_summary"      />
+        <result property="createTime"          column="create_time"          />
+        <result property="updateTime"          column="update_time"          />
+    </resultMap>
+
+    <sql id="selectMemoryVo">
+        select id, user_id, memory_type, content, keywords, vector_id, confidence,
+               source_record_id, hit_count, last_hit_time, create_time, update_time
+        from ai_user_memory
+    </sql>
+
+    <!-- INSERT IGNORE：配合 uk_user_content(user_id, content) 唯一索引，
+         并发抽取同一条记忆时只有一方真正插入，避免重复记忆累积 -->
+    <insert id="insertMemory" parameterType="AiUserMemory" useGeneratedKeys="true" keyProperty="id">
+        insert ignore into ai_user_memory
+            (user_id, memory_type, content, keywords, vector_id, confidence, source_record_id)
+        values
+            (#{userId}, #{memoryType}, #{content}, #{keywords}, #{vectorId}, #{confidence}, #{sourceRecordId})
+    </insert>
+
+    <select id="selectMemoriesByUserId" resultMap="AiUserMemoryResult">
+        <include refid="selectMemoryVo"/>
+        where user_id = #{userId}
+        order by update_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectMemoriesByUserIdAndType" resultMap="AiUserMemoryResult">
+        <include refid="selectMemoryVo"/>
+        where user_id = #{userId} and memory_type = #{memoryType}
+        order by update_time desc
+        limit #{limit}
+    </select>
+
+    <select id="selectAllMemories" resultMap="AiUserMemoryResult">
+        <include refid="selectMemoryVo"/> order by id
+    </select>
+
+    <update id="incrementHit">
+        update ai_user_memory
+        set hit_count = hit_count + 1, last_hit_time = now()
+        where id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <!-- 原子自增：替代 touchProfile 中"读-改-写"的计数，避免并发丢失更新 -->
+    <update id="incrementProfileQuestion">
+        insert into ai_user_profile (user_id, total_questions, total_sessions, last_active_time)
+        values (#{userId}, 1, 1, now())
+        on duplicate key update
+            total_questions = total_questions + 1,
+            last_active_time = now()
+    </update>
+
+    <delete id="deleteMemoriesByUserId" parameterType="Long">
+        delete from ai_user_memory where user_id = #{userId}
+    </delete>
+
+    <select id="selectProfileByUserId" parameterType="Long" resultMap="AiUserProfileResult">
+        select id, user_id, tags, preferred_categories, preferred_books, total_questions,
+               total_sessions, last_active_time, profile_summary, create_time, update_time
+        from ai_user_profile
+        where user_id = #{userId}
+    </select>
+
+    <insert id="insertProfile" parameterType="AiUserProfile" useGeneratedKeys="true" keyProperty="id">
+        insert into ai_user_profile
+            (user_id, tags, preferred_categories, preferred_books, total_questions, total_sessions,
+             last_active_time, profile_summary)
+        values
+            (#{userId}, #{tags}, #{preferredCategories}, #{preferredBooks}, #{totalQuestions}, #{totalSessions},
+             #{lastActiveTime}, #{profileSummary})
+    </insert>
+
+    <update id="updateProfile" parameterType="AiUserProfile">
+        update ai_user_profile
+        <set>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="preferredCategories != null">preferred_categories = #{preferredCategories},</if>
+            <if test="preferredBooks != null">preferred_books = #{preferredBooks},</if>
+            <if test="totalQuestions != null">total_questions = #{totalQuestions},</if>
+            <if test="totalSessions != null">total_sessions = #{totalSessions},</if>
+            <if test="lastActiveTime != null">last_active_time = #{lastActiveTime},</if>
+            <if test="profileSummary != null">profile_summary = #{profileSummary},</if>
+        </set>
+        where user_id = #{userId}
+    </update>
+
+</mapper>
